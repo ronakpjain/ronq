@@ -1,2 +1,5 @@
 ronq
 ronq.dSYM
+
+.cache/
+compile_commands.json

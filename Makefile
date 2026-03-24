@@ -8,13 +8,16 @@ ifeq ($(findstring clang,$(UNAME_CC)),clang)
 	CXXFLAGS += -stdlib=libc++
 endif
 
-SRC := main.cpp \
+SRC := src/main.cpp \
 	src/core/errors.cpp \
 	src/core/pipe.cpp \
 	src/raw/command.cpp \
 	src/raw/runner.cpp \
 	src/config/parser.cpp \
-	src/config/cli.cpp
+	src/config/cli.cpp \
+	src/proc/spawn.cpp \
+	src/proc/signals.cpp \
+	src/proc/orchestrator.cpp
 BIN := ronq
 
 .PHONY: all build clean run

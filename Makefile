@@ -2,12 +2,6 @@ CXX ?= clang++
 CXXFLAGS ?= -std=c++23 -Wall -Wextra -g
 CPPFLAGS ?= -Iinclude
 
-# Detect clang and add libc++ flag for compatibility on macOS
-UNAME_CC := $(shell $(CXX) --version 2>/dev/null | tr '[:upper:]' '[:lower:]')
-ifeq ($(findstring clang,$(UNAME_CC)),clang)
-	CXXFLAGS += -stdlib=libc++
-endif
-
 SRC := src/main.cpp \
 	src/core/errors.cpp \
 	src/core/pipe.cpp \
@@ -18,21 +12,25 @@ SRC := src/main.cpp \
 	src/proc/spawn.cpp \
 	src/proc/signals.cpp \
 	src/proc/orchestrator.cpp
+
+OBJ := $(SRC:.cpp=.o)
+DEP := $(OBJ:.o=.d)
+
 BIN := ronq
 
-.PHONY: all build clean run
+.PHONY: all build clean
 
 all: build
 
 build: $(BIN)
 
-$(BIN): $(SRC)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^
+$(BIN): $(OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 clean:
-	rm -f $(BIN) *.o
+	rm -f $(BIN) $(OBJ) $(DEP)
 
-# Usage: make run ARGS="<cmd1>" "<cmd2>"
-run: $(BIN)
-	@echo "Running: ./$(BIN) $$ARGS"
-	./$(BIN) $(ARGS)
+-include $(DEP)

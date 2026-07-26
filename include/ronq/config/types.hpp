@@ -1,12 +1,11 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 struct NamedConfig {
-    std::optional<std::string> bg;
+    std::vector<std::string> bg;
     std::string fg;
 };
 

@@ -2,7 +2,10 @@
 
 #include <format>
 #include <fstream>
+#include <iterator>
+#include <optional>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -90,6 +93,82 @@ parse_toml_string(std::string_view value, std::size_t line_number) {
     return out;
 }
 
+[[nodiscard]] std::expected<std::vector<std::string>, std::string>
+parse_toml_string_list(std::string_view value, std::size_t line_number) {
+    if (value.empty()) {
+        return std::unexpected{std::format(
+            "ronq.toml:{}: expected quoted string or array", line_number)};
+    }
+
+    if (value.front() != '[') {
+        auto parsed = parse_toml_string(value, line_number);
+        if (!parsed) {
+            return std::unexpected{parsed.error()};
+        }
+        return std::vector<std::string>{std::move(*parsed)};
+    }
+
+    if (value.back() != ']') {
+        return std::unexpected{
+            std::format("ronq.toml:{}: malformed array value", line_number)};
+    }
+
+    const std::string inner =
+        trim(std::string_view{value}.substr(1, value.size() - 2));
+    if (inner.empty()) {
+        return std::vector<std::string>{};
+    }
+
+    std::vector<std::string> out;
+    std::size_t token_start = 0;
+    bool in_quotes = false;
+    bool escaped = false;
+
+    for (std::size_t i = 0; i <= inner.size(); ++i) {
+        const bool at_end = (i == inner.size());
+        const char c = at_end ? ',' : inner[i];
+
+        if (!at_end) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                in_quotes = !in_quotes;
+                continue;
+            }
+        }
+
+        if ((at_end || c == ',') && !in_quotes) {
+            const std::string token = trim(
+                std::string_view{inner}.substr(token_start, i - token_start));
+            if (token.empty()) {
+                return std::unexpected{std::format(
+                    "ronq.toml:{}: empty array element", line_number)};
+            }
+
+            auto parsed = parse_toml_string(token, line_number);
+            if (!parsed) {
+                return std::unexpected{parsed.error()};
+            }
+
+            out.push_back(std::move(*parsed));
+            token_start = i + 1;
+        }
+    }
+
+    if (in_quotes || escaped) {
+        return std::unexpected{
+            std::format("ronq.toml:{}: malformed array value", line_number)};
+    }
+
+    return out;
+}
+
 } // namespace
 
 [[nodiscard]] std::expected<ConfigMap, std::string>
@@ -100,7 +179,7 @@ load_configs_from_file(const std::filesystem::path &path) {
     }
 
     struct PartialConfig {
-        std::optional<std::string> bg;
+        std::vector<std::string> bg;
         std::optional<std::string> fg;
     };
 
@@ -160,15 +239,21 @@ load_configs_from_file(const std::filesystem::path &path) {
         const std::string value_text =
             trim(std::string_view{line}.substr(eq + 1));
 
-        auto value = parse_toml_string(value_text, line_number);
-        if (!value) {
-            return std::unexpected{value.error()};
-        }
-
         auto &cfg = partials[*current_config];
         if (key == "bg") {
-            cfg.bg = *value;
+            auto values = parse_toml_string_list(value_text, line_number);
+            if (!values) {
+                return std::unexpected{values.error()};
+            }
+
+            cfg.bg.insert(cfg.bg.end(),
+                          std::make_move_iterator(values->begin()),
+                          std::make_move_iterator(values->end()));
         } else if (key == "fg") {
+            auto value = parse_toml_string(value_text, line_number);
+            if (!value) {
+                return std::unexpected{value.error()};
+            }
             cfg.fg = *value;
         } else {
             return std::unexpected{std::format(
@@ -185,9 +270,11 @@ load_configs_from_file(const std::filesystem::path &path) {
                 name)};
         }
 
-        if (partial.bg.has_value() && trim(*partial.bg).empty()) {
-            return std::unexpected{
-                std::format("ronq.toml: config '{}' has empty 'bg'", name)};
+        for (const auto &bg_cmd : partial.bg) {
+            if (trim(bg_cmd).empty()) {
+                return std::unexpected{
+                    std::format("ronq.toml: config '{}' has empty 'bg'", name)};
+            }
         }
 
         configs.emplace(name, NamedConfig{.bg = partial.bg, .fg = *partial.fg});

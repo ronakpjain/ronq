@@ -4,7 +4,7 @@
 
 #include <chrono>
 #include <csignal>
-#include <optional>
+#include <vector>
 
 extern volatile std::sig_atomic_t g_received_signal;
 extern volatile std::sig_atomic_t g_signal_count;
@@ -22,5 +22,6 @@ void install_signal_handlers();
     std::chrono::milliseconds kill_grace = std::chrono::milliseconds(1000),
     bool force_kill = false);
 
-[[nodiscard]] bool terminate_background(const std::optional<BgProcess> &bg,
-                                        bool force_kill = false);
+[[nodiscard]] bool
+terminate_backgrounds(const std::vector<BgProcess> &backgrounds,
+                      bool force_kill = false);

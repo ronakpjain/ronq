@@ -82,13 +82,17 @@ void install_signal_handlers() {
     return wait_for_exit(pid, kill_grace, status);
 }
 
-[[nodiscard]] bool terminate_background(const std::optional<BgProcess> &bg,
-                                        bool force_kill) {
-    if (!bg.has_value()) {
-        return true;
+[[nodiscard]] bool
+terminate_backgrounds(const std::vector<BgProcess> &backgrounds,
+                      bool force_kill) {
+    bool all_terminated = true;
+
+    for (const auto &bg : backgrounds) {
+        const bool terminated = terminate_group_and_reap(
+            bg.pid, bg.pgid, std::chrono::milliseconds(1000),
+            std::chrono::milliseconds(1000), force_kill);
+        all_terminated = all_terminated && terminated;
     }
 
-    return terminate_group_and_reap(
-        bg->pid, bg->pgid, std::chrono::milliseconds(1000),
-        std::chrono::milliseconds(1000), force_kill);
+    return all_terminated;
 }

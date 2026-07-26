@@ -15,7 +15,8 @@ void print_usage(std::string_view argv0) {
     std::println(stderr, "");
     std::println(stderr, "Config file (optional): ./ronq.toml");
     std::println(stderr, "  [configs.<name>]");
-    std::println(stderr, "  bg = \"<optional command>\"");
+    std::println(stderr,
+                 "  bg = \"<optional command>\" or [\"cmd1\", \"cmd2\"]");
     std::println(stderr, "  fg = \"<required command>\"");
 }
 
